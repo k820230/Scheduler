@@ -40,7 +40,7 @@ window.schedulerCloudPull = pull;
 window.schedulerCloudConfigured = configured;
 window.schedulerApplyCloudRecords = async records => {
   applyingRemote = true;
-  try { window.schedulerSetRecordsFromCloud(records); }
+  try { await window.schedulerSetRecordsFromCloud(records); }
   finally { applyingRemote = false; }
 };
 
