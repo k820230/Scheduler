@@ -8,6 +8,8 @@ const status = (message) => {
 let client = null;
 let applyingRemote = false;
 let syncChannel = null;
+let currentUser = null;
+const serviceWorkerReady = navigator.serviceWorker?.ready;
 const configured = Boolean(cfg.supabaseUrl && cfg.supabaseAnonKey);
 
 function b64ToBytes(value) {
@@ -81,6 +83,7 @@ function addCloudPanel() {
   }
   client = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
   client.auth.onAuthStateChange((_event, session) => {
+    currentUser = session?.user || null;
     if (!session?.user) {
       if (syncChannel) { client.removeChannel(syncChannel); syncChannel = null; }
       status("로그인되지 않았습니다."); return;
@@ -107,17 +110,16 @@ function addCloudPanel() {
       if (!("serviceWorker" in navigator) || !("PushManager" in window)) throw new Error("이 브라우저는 웹 푸시를 지원하지 않습니다.");
       if (location.protocol !== "https:" && location.hostname !== "localhost") throw new Error("HTTPS 환경에서만 사용할 수 있습니다.");
       if (!cfg.vapidPublicKey) throw new Error("VAPID 공개키가 config.js에 설정되지 않았습니다.");
+      if (!currentUser) throw new Error("먼저 이메일 로그인해주세요.");
       const permission = await Notification.requestPermission();
       if (permission !== "granted") throw new Error("알림 권한이 허용되지 않았습니다.");
-      const { data: auth } = await client.auth.getUser();
-      if (!auth.user) throw new Error("먼저 이메일 로그인해주세요.");
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await serviceWorkerReady;
       let subscription = await registration.pushManager.getSubscription();
       if (!subscription) subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true, applicationServerKey: b64ToBytes(cfg.vapidPublicKey)
       });
       const { error } = await client.from("push_subscriptions").upsert({
-        user_id: auth.user.id, endpoint: subscription.endpoint, subscription: subscription.toJSON()
+        user_id: currentUser.id, endpoint: subscription.endpoint, subscription: subscription.toJSON()
       }, { onConflict: "endpoint" });
       if (error) throw error;
       status("이 기기의 푸시 알림이 활성화되었습니다.");
