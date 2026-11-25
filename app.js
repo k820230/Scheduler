@@ -37,10 +37,10 @@ function exportCalendar(){
  const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//My Scheduler//iOS Calendar Export//KO','CALSCALE:GREGORIAN','METHOD:PUBLISH','X-WR-CALNAME:My Scheduler'];
  for(const r of events){
   const startDate=r.date.replace(/-/g,'');
+  if(r.time&&Number.isNaN(new Date(r.date+'T'+r.time+':00').getTime()))continue;
   lines.push('BEGIN:VEVENT','UID:'+icsEscape(r.id)+'@my-scheduler','DTSTAMP:'+stamp);
   if(r.time){
    const start=new Date(r.date+'T'+r.time+':00');
-   if(Number.isNaN(start.getTime()))continue;
    const end=new Date(start.getTime()+30*60*1000);
    const localStamp=d=>dateKey(d).replace(/-/g,'')+'T'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+'00';
    lines.push('DTSTART:'+startDate+'T'+r.time.replace(':','')+'00','DTEND:'+localStamp(end));
@@ -49,7 +49,7 @@ function exportCalendar(){
   }
   lines.push('SUMMARY:'+icsEscape(r.title));
   if(r.note)lines.push('DESCRIPTION:'+icsEscape(r.note));
-  if(r.repeat&&r.repeat!=='none')lines.push('RRULE:FREQ:'+({daily:'DAILY',weekly:'WEEKLY',monthly:'MONTHLY'}[r.repeat]));
+  if(r.repeat&&r.repeat!=='none')lines.push('RRULE:FREQ='+({daily:'DAILY',weekly:'WEEKLY',monthly:'MONTHLY'}[r.repeat]));
   if(r.time){
    for(const [trigger,label] of [['-PT30M','30분 전'],['-PT10M','10분 전'],['PT0M','정시']]){
     lines.push('BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:'+icsEscape(r.title+' ('+label+')'),'TRIGGER:'+trigger,'END:VALARM');
