@@ -2,6 +2,7 @@
 create table if not exists public.scheduler_records (
   user_id uuid primary key references auth.users(id) on delete cascade,
   records jsonb not null default '[]'::jsonb,
+  timezone text not null default 'UTC',
   updated_at timestamptz not null default now()
 );
 alter table public.scheduler_records enable row level security;
