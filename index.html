@@ -18,5 +18,7 @@
 <nav><button data-nav="schedule" class="active">일정</button><button data-nav="todo">할 일</button><button data-nav="settings">설정</button></nav>
 <button class="fab primary" id="addBtn" aria-label="추가">＋</button>
 <dialog id="editor"><form id="editForm"><h2 id="modalTitle">새 항목</h2><label>종류</label><select id="kind"><option value="event">일정</option><option value="todo">할 일</option></select><label>제목</label><input id="title" required maxlength="120" placeholder="무엇을 할까요?"><label>날짜</label><input id="date" type="date" required><div id="timeField"><label>시간</label><input id="time" type="time"></div><label>반복</label><select id="repeat"><option value="none">반복 없음</option><option value="daily">매일</option><option value="weekly">매주</option><option value="monthly">매월</option></select><label>메모</label><textarea id="note" rows="2"></textarea><div class="actions"><button type="button" id="cancelEdit">취소</button><button type="button" id="deleteBtn">삭제</button><button class="primary" type="submit">저장</button></div></form></dialog>
+<script src="./config.js"></script>
 <script src="./app.js"></script>
+<script type="module" src="./cloud.js"></script>
 </body></html>

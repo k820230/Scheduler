@@ -15,8 +15,8 @@ A lightweight installable Progressive Web App (PWA) for personal schedules and t
 ## Important limitations
 
 - Data is stored locally in the browser on each device.
-- **PC/iPhone cloud synchronization is not implemented in this version.**
-- Scheduled push notifications are not implemented; the notification permission UI alone does not schedule reminders.
+- PC/iPhone cloud sync and scheduled web-push support are provided as an opt-in Supabase integration; see [DEPLOYMENT.md](./DEPLOYMENT.md).
+- These cloud features remain inactive until a Supabase project is configured, the SQL migration and Edge Function are deployed, and each device signs in and enables push.
 - This version has not yet been verified on a physical iPhone.
 
 ## Run locally
