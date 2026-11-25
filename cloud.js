@@ -47,6 +47,7 @@ async function push(records) {
   if (error) status("클라우드 저장 실패: " + error.message);
 }
 window.schedulerCloudPush = records => {
+  if (applyingRemote) return;
   clearTimeout(window.schedulerCloudPushTimer);
   window.schedulerCloudPushTimer = setTimeout(() => push(records).catch(e => status("동기화 오류: " + e.message)), 700);
 };
