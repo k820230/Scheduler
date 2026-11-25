@@ -7,6 +7,7 @@ const status = (message) => {
 };
 let client = null;
 let applyingRemote = false;
+let syncChannel = null;
 const configured = Boolean(cfg.supabaseUrl && cfg.supabaseAnonKey);
 
 function b64ToBytes(value) {
@@ -21,6 +22,19 @@ async function pull() {
   const { data, error } = await client.from("scheduler_records").select("records").eq("user_id", auth.user.id).maybeSingle();
   if (error) throw error;
   return data?.records ?? null;
+}
+function watchRemoteChanges(userId) {
+  if (syncChannel) client.removeChannel(syncChannel);
+  syncChannel = client.channel("scheduler-records-" + userId)
+    .on("postgres_changes", {
+      event: "*", schema: "public", table: "scheduler_records", filter: "user_id=eq." + userId
+    }, async () => {
+      if (applyingRemote) return;
+      try {
+        const remote = await pull();
+        if (remote) await window.schedulerApplyCloudRecords(remote);
+      } catch (e) { status("실시간 동기화 오류: " + e.message); }
+    }).subscribe();
 }
 async function push(records) {
   if (!client || applyingRemote) return;
@@ -66,14 +80,18 @@ function addCloudPanel() {
   }
   client = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
   client.auth.onAuthStateChange((_event, session) => {
-    if (!session?.user) { status("로그인되지 않았습니다."); return; }
+    if (!session?.user) {
+      if (syncChannel) { client.removeChannel(syncChannel); syncChannel = null; }
+      status("로그인되지 않았습니다."); return;
+    }
     setTimeout(async () => {
       try {
         await window.schedulerAppReady;
         const remote = await pull();
         if (remote) await window.schedulerApplyCloudRecords(remote);
         else await push(window.schedulerGetRecords());
-        status("로그인됨 · 클라우드 동기화 사용 중");
+        watchRemoteChanges(session.user.id);
+        status("로그인됨 · 클라우드 실시간 동기화 사용 중");
       } catch (e) { status("동기화 오류: " + e.message); }
     }, 0);
   });
