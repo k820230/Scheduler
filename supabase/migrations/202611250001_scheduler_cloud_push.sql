@@ -34,3 +34,16 @@ alter table public.reminder_deliveries enable row level security;
 -- No client policies: only the server-side service role may write/read delivery history.
 
 create index if not exists push_subscriptions_user_id_idx on public.push_subscriptions(user_id);
+
+-- Enable Realtime notifications for schedule changes (idempotent).
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'scheduler_records'
+  ) then
+    alter publication supabase_realtime add table public.scheduler_records;
+  end if;
+end $$;
