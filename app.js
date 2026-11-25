@@ -62,6 +62,6 @@ function exportCalendar(){
  const blob=new Blob(['\\uFEFF',body],{type:'text/calendar;charset=utf-8'});
  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='my-scheduler-calendar.ics';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
-$('exportBtn').onclick=exportData;$('importFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const data=JSON.parse(await f.text());if(!Array.isArray(data.records))throw Error();if(confirm('현재 데이터를 백업 파일 내용으로 교체할까요?')){records=data.records;await saveAll();render();alert('복원이 완료되었습니다.')}}catch{alert('올바른 백업 파일이 아닙니다.')}e.target.value=''};
+$('exportBtn').onclick=exportData;$('calendarExportBtn').onclick=exportCalendar;$('importFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const data=JSON.parse(await f.text());if(!Array.isArray(data.records))throw Error();if(confirm('현재 데이터를 백업 파일 내용으로 교체할까요?')){records=data.records;await saveAll();render();alert('복원이 완료되었습니다.')}}catch{alert('올바른 백업 파일이 아닙니다.')}e.target.value=''};
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 window.schedulerAppReady=(async()=>{records=await load();render()})();
