@@ -3,7 +3,7 @@ const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMon
 let selected=today(),view='day',nav='schedule',records=[],editing=null;
 const dbPromise=new Promise((resolve,reject)=>{const r=indexedDB.open('my-scheduler-db',1);r.onupgradeneeded=()=>r.result.createObjectStore('records',{keyPath:'id'});r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
 async function load(){const db=await dbPromise;return new Promise(res=>{const q=db.transaction('records').objectStore('records').getAll();q.onsuccess=()=>res(q.result||[])})}
-async function saveAll(){const db=await dbPromise;return new Promise((res,rej)=>{const tx=db.transaction('records','readwrite'),s=tx.objectStore('records');s.clear();records.forEach(x=>s.put(x));tx.oncomplete=res;tx.onerror=()=>rej(tx.error)})}
+async function saveAll(){const db=await dbPromise;return new Promise((res,rej)=>{const tx=db.transaction('records','readwrite'),s=tx.objectStore('records');s.clear();records.forEach(x=>s.put(x));tx.oncomplete=()=>{res();window.schedulerCloudPush?.(records)};tx.onerror=()=>rej(tx.error)})}
 const fmt=d=>new Date(d+'T00:00:00').toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'short'});
 function occurs(r,date){if(r.date===date)return true;if(r.repeat==='none'||date<r.date)return false;const a=new Date(r.date+'T00:00:00'),b=new Date(date+'T00:00:00');if(r.repeat==='daily')return true;if(r.repeat==='weekly')return a.getDay()===b.getDay();if(r.repeat==='monthly')return a.getDate()===b.getDate();return false}
 function dateKey(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
@@ -31,4 +31,6 @@ function exportData(){const blob=new Blob([JSON.stringify({version:1,exportedAt:
 $('exportBtn').onclick=exportData;$('importFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const data=JSON.parse(await f.text());if(!Array.isArray(data.records))throw Error();if(confirm('현재 데이터를 백업 파일 내용으로 교체할까요?')){records=data.records;await saveAll();render();alert('복원이 완료되었습니다.')}}catch{alert('올바른 백업 파일이 아닙니다.')}e.target.value=''};
 $('notifyBtn').onclick=async()=>{if(!('Notification'in window)){$('notifyStatus').textContent='이 브라우저에서는 알림을 지원하지 않습니다.';return}let p=await Notification.requestPermission();$('notifyStatus').textContent='알림 권한: '+p};
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
-(async()=>{records=await load();render()})();
+window.schedulerGetRecords=()=>records;
+window.schedulerSetRecordsFromCloud=async items=>{records=Array.isArray(items)?items:[];await saveAll();render()};
+window.schedulerAppReady=(async()=>{records=await load();await window.schedulerCloudReady;render()})();
