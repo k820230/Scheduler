@@ -1,29 +1,5 @@
-const CACHE='my-scheduler-v2';
-const ASSETS=['./','./index.html','./app.js','./config.js','./cloud.js','./manifest.webmanifest','./icon.svg'];
+const CACHE='my-scheduler-v3';
+const ASSETS=['./','./index.html','./app.js','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))));
 self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;e.respondWith(caches.match(e.request).then(hit=>hit||fetch(e.request).then(res=>{const copy=res.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));return res}).catch(()=>caches.match('./index.html'))))});
-
-self.addEventListener('push', event => {
-  let data = {};
-  try { data = event.data ? event.data.json() : {}; } catch (_) {}
-  const title = data.title || 'My Scheduler';
-  const options = {
-    body: data.body || '일정 알림입니다.',
-    icon: './icon.svg',
-    badge: './icon.svg',
-    data: { url: data.url || './' },
-    tag: data.tag || 'my-scheduler-reminder'
-  };
-  event.waitUntil(self.registration.showNotification(title, options));
-});
-self.addEventListener('notificationclick', event => {
-  event.notification.close();
-  const target = new URL(event.notification.data?.url || './', self.location.origin).href;
-  event.waitUntil(clients.matchAll({type:'window', includeUncontrolled:true}).then(list => {
-    for (const client of list) {
-      if (client.url.startsWith(self.location.origin) && 'focus' in client) return client.focus();
-    }
-    return clients.openWindow(target);
-  }));
-});
