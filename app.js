@@ -29,11 +29,11 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{nav=b.dataset.
 function setNav(){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.nav===nav))}
 function exportData(){const blob=new Blob([JSON.stringify({version:1,exportedAt:new Date().toISOString(),records},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='my-scheduler-backup.json';a.click();URL.revokeObjectURL(a.href)}
 function icsEscape(value){return String(value||'').replace(/\\/g,'\\\\').replace(/\r?\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;')}
-function foldIcsLine(line){let out='',bytes=0;for(const ch of line){const n=new TextEncoder().encode(ch).length;if(bytes+n>73){out+='\\r\\n ';bytes=1}out+=ch;bytes+=n}return out}
+function foldIcsLine(line){let out='',bytes=0;for(const ch of line){const n=new TextEncoder().encode(ch).length;if(bytes+n>73){out+='\r\n ';bytes=1}out+=ch;bytes+=n}return out}
 function exportCalendar(){
  const events=records.filter(r=>r.kind==='event'&&r.date);
  if(!events.length){alert('캘린더로 내보낼 일정이 없습니다.');return}
- const stamp=new Date().toISOString().replace(/[-:]/g,'').replace(/\\.\\d{3}/,'');
+ const stamp=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
  const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//My Scheduler//iOS Calendar Export//KO','CALSCALE:GREGORIAN','METHOD:PUBLISH','X-WR-CALNAME:My Scheduler'];
  for(const r of events){
   const startDate=r.date.replace(/-/g,'');
@@ -58,8 +58,8 @@ function exportCalendar(){
   lines.push('END:VEVENT');
  }
  lines.push('END:VCALENDAR');
- const body=lines.map(foldIcsLine).join('\\r\\n')+'\\r\\n';
- const blob=new Blob(['\\uFEFF',body],{type:'text/calendar;charset=utf-8'});
+ const body=lines.map(foldIcsLine).join('\r\n')+'\r\n';
+ const blob=new Blob([body],{type:'text/calendar;charset=utf-8'});
  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='my-scheduler-calendar.ics';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 $('exportBtn').onclick=exportData;$('calendarExportBtn').onclick=exportCalendar;$('importFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const data=JSON.parse(await f.text());if(!Array.isArray(data.records))throw Error();if(confirm('현재 데이터를 백업 파일 내용으로 교체할까요?')){records=data.records;await saveAll();render();alert('복원이 완료되었습니다.')}}catch{alert('올바른 백업 파일이 아닙니다.')}e.target.value=''};
