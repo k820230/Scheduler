@@ -29,7 +29,7 @@ Install the Supabase CLI and authenticate, then link the project:
 supabase login
 supabase link --project-ref YOUR_PROJECT_REF
 supabase functions deploy send-reminders
-supabase secrets set VAPID_PUBLIC_KEY=YOUR_PUBLIC_KEY VAPID_PRIVATE_KEY=YOUR_PRIVATE_KEY
+supabase secrets set VAPID_PUBLIC_KEY=YOUR_PUBLIC_KEY VAPID_PRIVATE_KEY=YOUR_PRIVATE_KEY VAPID_SUBJECT=mailto:YOUR_EMAIL
 ```
 
 The function uses the Supabase-provided `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` secrets. Do not expose either secret in the browser.
@@ -71,6 +71,6 @@ The job checks for due reminders once per minute. Check Supabase Cron run histor
 ## Current implementation notes
 
 - Schedule data is synchronized as one JSON document per signed-in user; simultaneous edits from two devices are last-write-wins. Avoid editing on both devices at exactly the same time.
-- Reminder offsets are 0, 10, and 30 minutes. The backend uses the event's local browser/server timezone interpretation; the current schema stores date/time as local strings. For users travelling across time zones, a future migration should store an explicit IANA timezone per event.
+- Reminder offsets are 0, 10, and 30 minutes. The user's current IANA timezone is stored with their schedule and used to interpret local event date/time values. If a user changes time zones, saving from that device updates the account timezone.
 - Repeating daily/weekly/monthly event support is included in the reminder worker.
 - Push delivery depends on browser permission, device connectivity, and platform delivery; delivery time is not guaranteed to the exact second.
