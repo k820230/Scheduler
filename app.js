@@ -3,7 +3,7 @@ const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMon
 let selected=today(),view='day',nav='schedule',records=[],editing=null;
 const dbPromise=new Promise((resolve,reject)=>{const r=indexedDB.open('my-scheduler-db',1);r.onupgradeneeded=()=>r.result.createObjectStore('records',{keyPath:'id'});r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
 async function load(){const db=await dbPromise;return new Promise(res=>{const q=db.transaction('records').objectStore('records').getAll();q.onsuccess=()=>res(q.result||[])})}
-async function saveAll(){const db=await dbPromise;return new Promise((res,rej)=>{const tx=db.transaction('records','readwrite'),s=tx.objectStore('records');s.clear();records.forEach(x=>s.put(x));tx.oncomplete=()=>{res();window.schedulerCloudPush?.(records)};tx.onerror=()=>rej(tx.error)})}
+async function saveAll(){const db=await dbPromise;return new Promise((res,rej)=>{const tx=db.transaction('records','readwrite'),s=tx.objectStore('records');s.clear();records.forEach(x=>s.put(x));tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)})}
 const fmt=d=>new Date(d+'T00:00:00').toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'short'});
 function occurs(r,date){if(r.date===date)return true;if(r.repeat==='none'||date<r.date)return false;const a=new Date(r.date+'T00:00:00'),b=new Date(date+'T00:00:00');if(r.repeat==='daily')return true;if(r.repeat==='weekly')return a.getDay()===b.getDay();if(r.repeat==='monthly')return a.getDate()===b.getDate();return false}
 function dateKey(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
@@ -28,9 +28,40 @@ document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{view=b.datas
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{nav=b.dataset.nav;if(nav==='todo')view='todo';$('settings').hidden=nav!=='settings';$('addBtn').hidden=nav==='settings';if(nav!=='settings')render();setNav()});
 function setNav(){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.nav===nav))}
 function exportData(){const blob=new Blob([JSON.stringify({version:1,exportedAt:new Date().toISOString(),records},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='my-scheduler-backup.json';a.click();URL.revokeObjectURL(a.href)}
-$('exportBtn').onclick=exportData;$('importFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const data=JSON.parse(await f.text());if(!Array.isArray(data.records))throw Error();if(confirm('현재 데이터를 백업 파일 내용으로 교체할까요?')){records=data.records;await saveAll();render();alert('복원이 완료되었습니다.')}}catch{alert('올바른 백업 파일이 아닙니다.')}e.target.value=''};
-$('notifyBtn').onclick=async()=>{if(!('Notification'in window)){$('notifyStatus').textContent='이 브라우저에서는 알림을 지원하지 않습니다.';return}let p=await Notification.requestPermission();$('notifyStatus').textContent='알림 권한: '+p};
+function icsEscape(value){return String(value||'').replace(/\\/g,'\\\\').replace(/\r?\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;')}
+function foldIcsLine(line){let out='',bytes=0;for(const ch of line){const n=new TextEncoder().encode(ch).length;if(bytes+n>73){out+='\r\n ';bytes=1}out+=ch;bytes+=n}return out}
+function exportCalendar(){
+ const events=records.filter(r=>r.kind==='event'&&r.date);
+ if(!events.length){alert('캘린더로 내보낼 일정이 없습니다.');return}
+ const stamp=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
+ const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//My Scheduler//iOS Calendar Export//KO','CALSCALE:GREGORIAN','METHOD:PUBLISH','X-WR-CALNAME:My Scheduler'];
+ for(const r of events){
+  const startDate=r.date.replace(/-/g,'');
+  if(r.time&&Number.isNaN(new Date(r.date+'T'+r.time+':00').getTime()))continue;
+  lines.push('BEGIN:VEVENT','UID:'+icsEscape(r.id)+'@my-scheduler','DTSTAMP:'+stamp);
+  if(r.time){
+   const start=new Date(r.date+'T'+r.time+':00');
+   const end=new Date(start.getTime()+30*60*1000);
+   const localStamp=d=>dateKey(d).replace(/-/g,'')+'T'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+'00';
+   lines.push('DTSTART:'+startDate+'T'+r.time.replace(':','')+'00','DTEND:'+localStamp(end));
+  }else{
+   lines.push('DTSTART;VALUE=DATE:'+startDate,'DTEND;VALUE=DATE:'+plus(r.date,1).replace(/-/g,''));
+  }
+  lines.push('SUMMARY:'+icsEscape(r.title));
+  if(r.note)lines.push('DESCRIPTION:'+icsEscape(r.note));
+  if(r.repeat&&r.repeat!=='none')lines.push('RRULE:FREQ='+({daily:'DAILY',weekly:'WEEKLY',monthly:'MONTHLY'}[r.repeat]));
+  if(r.time){
+   for(const [trigger,label] of [['-PT30M','30분 전'],['-PT10M','10분 전'],['PT0M','정시']]){
+    lines.push('BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:'+icsEscape(r.title+' ('+label+')'),'TRIGGER:'+trigger,'END:VALARM');
+   }
+  }
+  lines.push('END:VEVENT');
+ }
+ lines.push('END:VCALENDAR');
+ const body=lines.map(foldIcsLine).join('\r\n')+'\r\n';
+ const blob=new Blob([body],{type:'text/calendar;charset=utf-8'});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='my-scheduler-calendar.ics';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+$('exportBtn').onclick=exportData;$('calendarExportBtn').onclick=exportCalendar;$('importFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const data=JSON.parse(await f.text());if(!Array.isArray(data.records))throw Error();if(confirm('현재 데이터를 백업 파일 내용으로 교체할까요?')){records=data.records;await saveAll();render();alert('복원이 완료되었습니다.')}}catch{alert('올바른 백업 파일이 아닙니다.')}e.target.value=''};
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
-window.schedulerGetRecords=()=>records;
-window.schedulerSetRecordsFromCloud=async items=>{records=Array.isArray(items)?items:[];await saveAll();render()};
-window.schedulerAppReady=(async()=>{records=await load();await window.schedulerCloudReady;render()})();
+window.schedulerAppReady=(async()=>{records=await load();render()})();
