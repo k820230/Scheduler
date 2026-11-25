@@ -27,7 +27,8 @@ async function push(records) {
   const { data: auth } = await client.auth.getUser();
   if (!auth.user) return;
   const { error } = await client.from("scheduler_records").upsert({
-    user_id: auth.user.id, records, updated_at: new Date().toISOString()
+    user_id: auth.user.id, records, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+    updated_at: new Date().toISOString()
   }, { onConflict: "user_id" });
   if (error) status("클라우드 저장 실패: " + error.message);
 }
@@ -64,14 +65,17 @@ function addCloudPanel() {
     return;
   }
   client = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
-  client.auth.onAuthStateChange(async (_event, session) => {
+  client.auth.onAuthStateChange((_event, session) => {
     if (!session?.user) { status("로그인되지 않았습니다."); return; }
-    try {
-      const remote = await pull();
-      if (remote) await window.schedulerApplyCloudRecords(remote);
-      else await push(window.schedulerGetRecords());
-      status("로그인됨 · 클라우드 동기화 사용 중");
-    } catch (e) { status("동기화 오류: " + e.message); }
+    setTimeout(async () => {
+      try {
+        await window.schedulerAppReady;
+        const remote = await pull();
+        if (remote) await window.schedulerApplyCloudRecords(remote);
+        else await push(window.schedulerGetRecords());
+        status("로그인됨 · 클라우드 동기화 사용 중");
+      } catch (e) { status("동기화 오류: " + e.message); }
+    }, 0);
   });
   panel.querySelector("#cloudLogin").onclick = async () => {
     const email = panel.querySelector("#cloudEmail").value.trim();
